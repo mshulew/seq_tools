@@ -5,7 +5,8 @@
 
 Downsamples fastq file(s)
 Accepts single R1 or R1/R2 pairs
-faster processing than original version
+faster processing than original version, but not released version
+unzip files in python, multiprocessing to zip
 
 """
 
