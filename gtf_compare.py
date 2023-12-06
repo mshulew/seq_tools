@@ -3,6 +3,7 @@
 
 """
 compares 2 gtf files and outputs differences
+usage: gtf_compare.py [gtf file 1] [gtf file 2] [output file]
 """
 
 import sys
