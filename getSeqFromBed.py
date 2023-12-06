@@ -3,7 +3,7 @@
 
 """
 retrieves nucleotide sequence from reference genome
-usage: seqFromBed.py [reference genome as fasta file] [lbed file] [output file]
+usage: seqFromBed.py [reference genome as fasta file] [bed file] [output file]
 """
 
 import sys
