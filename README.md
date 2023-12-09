@@ -1,2 +1,2 @@
-# seq_tools
-Various tools for analyzing and comparing sequence files
+# Sequencing Tools
+## Assorted software for analyzing and processing NGS data
