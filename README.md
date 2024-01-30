@@ -1,2 +1,32 @@
 # Sequencing Tools
-## Assorted software for analyzing and processing NGS data
+## Various utilities, includes processing of NGS-related files
+Most of these file aren't very useful except as references (most useful ones are in bold)
+- UMIcountN.py: counts number of UMIs with 1, 2, 3, 4, 5, 6, 7 or 8 Ns for 8 bp UMIs; counts number of UMIs at each length up to 8 bp
+- autocat.sh: batch script that concatenates individual NextSeq Lane files into a single file
+- autocat2.sh: 2nd version of autocat.sh
+- bash_script_tester.py: Executes Linus bash command lines from Python
+- bulk_file_move.sh: bash script to move all files in all subdirectories to a single directory
+- convert_mirna_counts_v1.py: consolidates all mature miRNA gene counts 7 tpm under miRNA precursor gene name
+- count fastq.sh: bash script to count FASTQ entries in a file
+- **downsamplefastq.py: downsamples a single or pair of FASTQ files**
+- downsamplefastq_archived.py: an older version of downsamplefastq.py that I've kept around as a reference
+- fake_r2_generator.py: creates a fake FASTQ R2 file for pipelines that just need an R2; requires an R1 file as input
+- fastq_qc.py: Calculate GC content from a FASTQ file
+- fastq_reverse_complement.py:  Generates reverse complement of a FASTQ file
+- fastqrc.sh: Bash file that creates reverse complement of a FASTQ file
+- fastqrc2.sh: Alternative version of fastqrc.sh
+- getSeq.py: Retrieves nucleotide sequence from a FASTQ file when supplied name/chromosome, strand, start position & stop position
+- getSeqFromBed.py: Retrieves nucleotide sequence from a reference genome when provided bed file
+- get_transcript_seq.py: Retrieves nucleotide sequences for a transcript when provided transcript_id, gtf file and fasta genome reference
+- gtf_compare.py: compares 2 gtf files and outputs differences
+- keepReads.py: keep/retain only reads in a pair of FASTQ files included in a supplied list
+- list_fastq_index.py: extracts all index sequenes from an Illumina FASTQ file - used for troubleshooting deconvolution
+- mirna_list_from_gtf.py: generates list of all miRNAs from a GTF file
+- process_unindexed_fastq.py: deconvolutes a non-deconvoluted Illumina FASTQ file
+- readLengthDistr.py: Calculates length of each read in a FASTQ file
+- removerRNA.sh: Bash scrip to remove rRNA reads from a fastq file
+- removereads.py: Removes reads from a FASTQ file, requires list of reads to remove
+- rename_files.sh:  Bash script to rename files across 4 directories
+- rumi_compare.py:  Compares pre- and post- deduplication BAM files
+- script_test: empty Python template to test scripts
+- slowalign.py:  Aligns short sequenes to a reference by brute force
