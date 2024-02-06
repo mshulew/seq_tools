@@ -29,7 +29,7 @@ def generatename(inputfilename,sizename):
 
 def main():
 
-    version_num = 1.4
+    version_num = 1.5
     
     start_time = time.time()
     
@@ -191,44 +191,44 @@ def main():
 
 
 # check input number of reads
-            if inputreadnum < int(number_of_reads):
-                print('Input number of reads ({}) less than downsampled number of reads ({}); will not downsample'.format(str(inputreadnum),number_of_reads))
-            else:
+        if inputreadnum < int(number_of_reads):
+            print('Input number of reads ({}) less than downsampled number of reads ({}); will not downsample'.format(str(inputreadnum),number_of_reads))
+        else:
                 
 # create mask: random list of entries to select
-                print('generating mask...')
-                mask = [True] * number_of_reads + [False] * (inputreadnum - number_of_reads)
-                random.shuffle(mask)
+            print('generating mask...')
+            mask = [True] * number_of_reads + [False] * (inputreadnum - number_of_reads)
+            random.shuffle(mask)
                 
 # downsample
-                print('downsampling reads...')
-                with open(tmp_dir + '/downsampled.tsv','w') as output_file:
-                    with open(tmp_dir + '/compressed.tsv', 'r') as input_file:
-                        for line in input_file:
-                            if mask.pop():
-                                output_file.write(line)
+            print('downsampling reads...')
+            with open(tmp_dir + '/downsampled.tsv','w') as output_file:
+                with open(tmp_dir + '/compressed.tsv', 'r') as input_file:
+                    for line in input_file:
+                        if mask.pop():
+                            output_file.write(line)
                                 
 # writing output files
-                print('writing to file...')
-                if read_pairs:
+            print('writing to file...')
+            if read_pairs:
 
 # generate output filenames
-                    r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
-                    r2_output_filename = output_dir + '/' + generatename(input_filename[1],readable_reads) + '.gz'     
+                r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
+                r2_output_filename = output_dir + '/' + generatename(input_filename[1],readable_reads) + '.gz'     
     
 # split compressed file and write output
-                    cmd = 'cat {} | tee >(cut -f 1-4 | tr "\t" "\n" | pigz > {}) | cut -f 5-8 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename,r2_output_filename)
-                    process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                    process.wait()
+                cmd = 'cat {} | tee >(cut -f 1-4 | tr "\t" "\n" | pigz > {}) | cut -f 5-8 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename,r2_output_filename)
+                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+                process.wait()
 
-                else:                
+            else:                
 # generate output filename
-                    r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
+                r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
     
 # split compressed file and write output
-                    cmd = 'cat {} | cut -f 1-4 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename)
-                    process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                    process.wait()  
+                cmd = 'cat {} | cut -f 1-4 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename)
+                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+                process.wait()  
                                           
 # delete temporary directory
         shutil.rmtree(tmp_dir)
