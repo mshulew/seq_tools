@@ -4,7 +4,7 @@
 """
 Downsamples fastq files
 Accepts single R1 or R1/R2 pairs
-version launched: February 8, 2021
+Updated to reduce memory requirements: February 2024
 """
 
 import os
@@ -13,7 +13,6 @@ import time
 import io
 import subprocess
 import random
-import gzip
 import shutil
 
 def generatename(inputfilename,sizename):
@@ -28,15 +27,15 @@ def generatename(inputfilename,sizename):
 
     return filename
 
-if __name__ == "__main__":
-    
+def main():
+
     version_num = 1.4
     
     start_time = time.time()
     
     print('*'*100)
     print('FASTQ downsampler')
-    print('2020 Mark Shulewiz Bio-Rad Laboratories, Inc.')
+    print('2024 Mark Shulewitz')
     print('version ' + str(version_num))
     print('*'*100)
     
@@ -60,12 +59,12 @@ if __name__ == "__main__":
     elif len(sys.argv) > 2:
         input_trigger = False
         for a in range(0, len(sys.argv)):
-            if input_trigger == True:
+            if input_trigger:
                 if sys.argv[a][0:2] == '--':
                     input_trigger = False
                 else:
                     cli_input_filenames.append(sys.argv[a])
-            if input_trigger == False:
+            if not input_trigger:
                 if a < len(sys.argv) - 1:
                     if sys.argv[a] == '--I':
                         input_trigger = True
@@ -75,7 +74,6 @@ if __name__ == "__main__":
                         input_number_of_reads = sys.argv[a + 1]
     else:
         print('Error 2: something is missing in the commandline')
-        exit()
         
 # process number of reads
     if input_number_of_reads != 0:
@@ -162,11 +160,11 @@ if __name__ == "__main__":
             shutil.rmtree(tmp_dir)
         os.makedirs(tmp_dir)
         
-# process single reads
+# unzip fastq files
+# if single R1
         if len(input_filename) == 1:
-            print('Processing R1 file: {}'.format(input_filename[0]))
-            
-# unzip fastq
+            read_pairs = False
+            print('Processing R1 file: {}'.format(input_filename[0])) 
             print('unzipping file...')
     
             cmd = 'pigz -d -c {} | paste - - - - > {}'.format(input_filename[0],tmp_dir + '/compressed.tsv')
@@ -176,33 +174,9 @@ if __name__ == "__main__":
             inputreadnum = subprocess.run(['wc','-l',tmp_dir + '/compressed.tsv'], stdout=subprocess.PIPE)
             inputreadnum = int(str(inputreadnum.stdout).split()[0].strip("b'"))
 
-            if inputreadnum < int(number_of_reads):
-                print('Input number of reads ({}) less than downsampled number of reads ({}); will not downsample'.format(str(inputreadnum),number_of_reads))
-            else:
-                
-# shuffle
-                print('shuffling reads...')
-                cmd = 'shuf {} > {}'.format(tmp_dir + '/compressed.tsv',tmp_dir + '/shuffled.tsv')
-                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                process.wait()  
-                
-# downsample
-                print('downsampling reads...')
-                cmd = 'head -{} {} > {}'.format(number_of_reads,tmp_dir + '/shuffled.tsv',tmp_dir + '/downsampled.tsv')
-                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                process.wait()
-                
-# generate output filename
-                r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
-    
-# split compressed file and write output
-                print('writing output files...')
-                cmd = 'cat {} | cut -f 1-4 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename)
-                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                process.wait()  
-
-# process read pairs
+# if R1 R2 read pairs
         elif len(input_filename) == 2:
+            read_pairs = True
             print('Processing R1 file: {}'.format(input_filename[0]))
             print('Processing R2 file: {}'.format(input_filename[1]))
             
@@ -215,31 +189,46 @@ if __name__ == "__main__":
             inputreadnum = subprocess.run(['wc','-l',tmp_dir + '/compressed.tsv'], stdout=subprocess.PIPE)
             inputreadnum = int(str(inputreadnum.stdout).split()[0].strip("b'"))
 
+
+# check input number of reads
             if inputreadnum < int(number_of_reads):
                 print('Input number of reads ({}) less than downsampled number of reads ({}); will not downsample'.format(str(inputreadnum),number_of_reads))
             else:
                 
-# shuffle
-                print('shuffling reads...')
-                cmd = 'shuf {} > {}'.format(tmp_dir + '/compressed.tsv',tmp_dir + '/shuffled.tsv')
-                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                process.wait()                                                                                            
- 
+# create mask: random list of entries to select
+                print('generating mask...')
+                mask = [True] * number_of_reads + [False] * (inputreadnum - number_of_reads)
+                random.shuffle(mask)
+                
 # downsample
                 print('downsampling reads...')
-                cmd = 'head -{} {} > {}'.format(number_of_reads,tmp_dir + '/shuffled.tsv',tmp_dir + '/downsampled.tsv')
-                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                process.wait() 
-                       
+                with open(tmp_dir + '/downsampled.tsv','w') as output_file:
+                    with open(tmp_dir + '/compressed.tsv', 'r') as input_file:
+                        for line in input_file:
+                            if mask.pop():
+                                output_file.write(line)
+                                
+# writing output files
+                print('writing to file...')
+                if read_pairs:
+
 # generate output filenames
-                r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
-                r2_output_filename = output_dir + '/' + generatename(input_filename[1],readable_reads) + '.gz'     
+                    r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
+                    r2_output_filename = output_dir + '/' + generatename(input_filename[1],readable_reads) + '.gz'     
     
 # split compressed file and write output
-                print('writing output files...')
-                cmd = 'cat {} | tee >(cut -f 1-4 | tr "\t" "\n" | pigz > {}) | cut -f 5-8 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename,r2_output_filename)
-                process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
-                process.wait()  
+                    cmd = 'cat {} | tee >(cut -f 1-4 | tr "\t" "\n" | pigz > {}) | cut -f 5-8 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename,r2_output_filename)
+                    process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+                    process.wait()
+
+                else:                
+# generate output filename
+                    r1_output_filename = output_dir + '/' + generatename(input_filename[0],readable_reads) + '.gz'
+    
+# split compressed file and write output
+                    cmd = 'cat {} | cut -f 1-4 | tr "\t" "\n" | pigz > {}'.format(tmp_dir + '/downsampled.tsv',r1_output_filename)
+                    process = subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+                    process.wait()  
                                           
 # delete temporary directory
         shutil.rmtree(tmp_dir)
@@ -249,3 +238,12 @@ if __name__ == "__main__":
     elapsed_time_sec = time.time() - start_time
     elapsed_time_minutes = (elapsed_time_sec - (elapsed_time_sec % 60))/60
     print('finished, elapsed time: {} min {} sec'.format(elapsed_time_minutes,int(elapsed_time_sec % 60)))
+
+
+    
+
+if __name__ == "__main__":
+
+    main()
+    
+
