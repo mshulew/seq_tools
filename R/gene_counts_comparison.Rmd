@@ -1,0 +1,145 @@
+---
+title: "Compare featureCounts gene counts files: FPKM CV and correlation"
+output: html_document
+date: "March 12, 2024"
+author: Mark Shulewitz
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringr)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+```
+Method: Plot FPKMs for every library against every other library
+        FPKM range: 0.1 - 5
+
+```{r import_data, include=FALSE}
+
+# all gene counts files must first be filtered for columns 1, 6 & 7 (ie: cut -f1,6,7 path/to/original/gene/counts/file > path/to/filtered/gene/counts/file
+# all filtered gene counts files must be in a single directory (gene_counts_dir)
+# all filtered gene counts files names must end in _genecounts.tsv and the underscore must be proceeded by the sample name
+
+gene_counts_dir <- '/path/to/directory/with/gene/counts/files/'
+gene_counts_files <- str_sort(list.files(gene_counts_dir, full.names = TRUE),numeric=TRUE)
+
+
+for(a in 1:length(gene_counts_files)){
+  split_str <- gene_counts_files[a] %>%
+    str_split("/") %>%
+    .[[1]]
+  sampleName <- split_str[length(split_str)]
+  str_split <- sampleName %>% 
+    str_split("_") %>% 
+    .[[1]]
+  sampleName <- str_split[1]
+  
+# create temp table  
+  temp_tbl <- read_tsv(gene_counts_files[a]) %>% rename(counts := 3)
+  
+# convert counts to fpkm
+  
+# divide total reads by 1,000,000
+  norm_factor <- sum(temp_tbl$counts)/1000000
+  
+# divide read counts by total_counts/1,000,000
+  rpm <- temp_tbl$counts/norm_factor
+  
+# divide rpm by gene length
+  rpkm_tbl <- temp_tbl %>% mutate(rpkm = rpm/Length)
+
+  if(a == 1){
+    consolidated_tbl <- rpkm_tbl %>%
+      select(Geneid,Length,rpkm) %>% rename(!!sampleName := rpkm)
+  } else if(a > 1){
+    consolidated_tbl <- consolidated_tbl %>% mutate(!!sampleName := rpkm_tbl$rpkm[match(Geneid,consolidated_tbl$Geneid)])
+  }
+}
+
+# sort in reverse order
+  sorted_tbl <- consolidated_tbl %>% arrange(desc(!!sym(names(consolidated_tbl[3]))))
+
+# truncate table for rpkm values between 0.1 and 15
+upper_val = 5
+lower_val = 0.1
+truncated_tbl <- sorted_tbl %>% filter(!!sym(names(sorted_tbl[3])) > lower_val) %>% filter(!!sym(names(sorted_tbl[3])) < upper_val)
+
+# write table to file
+write_tsv(sorted_tbl, 'path/to/output/file')
+
+```
+
+```{r replicate_cv, include=FALSE}
+
+# import list of replicate groups
+  # format for replicate_groups file:
+  # table with 2 or more columns
+  # first column: name of group
+  # columns 2+: replicate 1, 2, 3 and so on
+  # each entry in table: sample name that preceeds underscore in genecounts file name
+  replicate_groups_path <- '/path/to/replicate/groups/file'
+  replicate_groups <- read_tsv(replicate_groups_path, col_names = TRUE)
+  for (a in 1:nrow(replicate_groups)){
+    groupName <- replicate_groups[a,1] %>% .[[1]]
+    for (b in 2:ncol(replicate_groups)){
+      libraryName <- replicate_groups[a,b] %>% .[[1]]
+      library_tbl <- truncated_tbl %>% select(Geneid,!!libraryName)
+      if(b == 2){
+        group_tbl <- library_tbl
+      } else if(b > 2){
+        group_tbl <- inner_join(group_tbl,library_tbl, by ="Geneid")
+      }
+    }
+    avg <- rowMeans(group_tbl[, 2:4])
+    stdev <- apply(group_tbl[,2:4],1,sd)
+    group_tbl$cv <- (stdev/avg)*100
+    group_tbl$cv[is.nan( group_tbl$cv)] <- 0
+    group_tbl <- group_tbl %>% select(Geneid,cv)
+    group_tbl <- group_tbl %>% rename(!!paste(groupName,'CV') := cv)
+    
+    if(a == 1){
+      replicate_tbl <- group_tbl
+    } else if (a > 1){
+      replicate_tbl <- inner_join(replicate_tbl,group_tbl, by = "Geneid")
+    }
+  }
+  
+# write table to file
+write_tsv(replicate_tbl, 'path/to/output/file')  
+
+```
+
+```{r cv_scatterplot, echo=FALSE, fig.width=9}
+
+melt_val <- reshape2::melt(replicate_tbl, id.vars = c("Geneid"))
+melt_val <- melt_val %>% rename(Percent_CV = value) %>% rename(library = variable)
+
+plot <- ggplot(melt_val, aes(x=Geneid,y=Percent_CV,color=library)) + geom_point(position = position_dodge(width = .3)) + ylab("Percent CV")
+
+ggplotly(plot)
+
+```
+
+```{r generate_scatter_plots, echo=FALSE, fig.width=3, fig.height=3}
+
+for(col1 in 3:(ncol(truncated_tbl) - 1)){
+  for(col2 in (col1 + 1):ncol(truncated_tbl)){
+
+   
+    correlation = round(cor(truncated_tbl[col1],truncated_tbl[col2],method="pearson")[1],digits=3)
+  
+    plot <- ggplot(truncated_tbl, aes(x = !!sym(names(truncated_tbl[col1])), y = !!sym(names(truncated_tbl[col2])), text = Geneid)) + 
+      geom_point() + labs(x = names(truncated_tbl)[col1], y = names(truncated_tbl)[col2]) + 
+      ggtitle(paste(names(truncated_tbl[col1])," & ", names(truncated_tbl[col2])," (R=",correlation,")",sep="")) +
+      theme(plot.title = element_text(size = 8),
+            axis.title.x = element_text(size = 6),
+            axis.title.y = element_text(size = 6)) +
+      scale_x_continuous(trans = "log10") +
+      scale_y_continuous(trans = "log10")
+    
+    print(plot)
+  }
+}
+```
